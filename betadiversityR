@@ -1,0 +1,217 @@
+# beta diversity plots
+
+#Load the packages. Everyone needs to do this.
+library(tidyverse)
+library(vegan)
+library(qiime2R)
+
+getwd()
+###Set your working directory path
+setwd("/anscproject/rdata")
+
+list.files()
+
+if(!dir.exists("output"))
+  dir.create("output")
+
+#How to load a file into R
+metadata2 <- read.delim("Proctor_Metadata_ansc516_excel.tsv", sep = "\t", header = T, quote = "", stringsAsFactors = F)
+metadata2[1,]
+metadata2[,1]
+# When subsetting, the first number is the row and after the comma is the column
+metadata2 <- metadata2[-1,]
+
+#Now the qiime2R method
+metadata<-read_q2metadata("Proctor_Metadata_ansc516_excel.tsv")
+str(metadata)
+levels(metadata$`StagnationTime`)
+colnames(metadata)[8] <- "Material"
+colnames(metadata)[9] <- "stagnation.time"
+colnames(metadata)[10] <- "when.sampled"
+str(metadata)
+
+row.names(metadata) <- metadata[,1]
+row.names(metadata) <- metadata$SampleID
+#metadata <- metadata[,-1]
+row.names(metadata)
+
+bc_PCoA<-read_qza("core-metrics-results/bray_curtis_pcoa_results.qza")
+wUF <- read_qza("core-metrics-results/weighted_unifrac_pcoa_results.qza")
+
+stagtime_colors <- c("Black", "Blue", "Green", "Gray", "purple", "red", "orange")
+
+bc_meta <- bc_PCoA$data$Vectors %>%
+  select(SampleID, PC1, PC2, PC3) %>%
+  inner_join(metadata, by = c("SampleID" = "SampleID"))
+
+# Now we are going to make an ordination plot
+ggplot(bc_meta, aes(x=PC1, y=PC2, color=stagnation.time)) +
+  geom_point() + #alpha controls transparency and helps when points are overlapping
+  theme_q2r() +
+  xlab("PC1 (32.27%)") +
+  ylab("PC2 (22.28%)") +
+  scale_color_manual(values=c("Black", "Green", "Blue", "Gray", "purple", "red", "orange"), name = "stagnation-time")
+
+# Now we are going to make our code a little more re-usable
+my_column <- "stagnation.time"
+#my_column <- "DietTreatment"
+
+ggplot(bc_meta, aes(x=PC1, y=PC2, color=get(my_column))) +
+  geom_point() + #alpha controls transparency and helps when points are overlapping
+  theme_q2r() +
+  #facet_grid(~Material) +
+  xlab(paste0("PC1 (", round(100*bc_PCoA$data$ProportionExplained[1], digits = 2), "%)")) +
+  ylab(paste0("PC2 (", round(100*bc_PCoA$data$ProportionExplained[2], digits = 2), "%)")) +
+  scale_color_manual(values=stagtime_colors, name = my_column)
+ggsave(paste0("output/BC-basic_", my_column,".tiff"), height=2, width=3, device="tiff") # save a PDF 3 inches by 4 inches
+
+centroids <- aggregate(cbind(PC1,PC2)~get(my_column),bc_meta,mean)
+colnames(centroids)[1] <- "stagnation.time"
+
+ggplot(bc_meta, aes(x=PC1, y=PC2, color=get(my_column))) +
+  geom_point() + #alpha controls transparency and helps when points are overlapping
+  geom_point(data=centroids, size = 3) +
+  theme_q2r() +
+  stat_ellipse(level = 0.95, type = "t") +
+  xlab(paste0("PC1 (", round(100*bc_PCoA$data$ProportionExplained[1], digits = 2), "%)")) +
+  ylab(paste0("PC2 (", round(100*bc_PCoA$data$ProportionExplained[2], digits = 2), "%)")) +
+  scale_color_manual(values=stagtime_colors, name = my_column)
+ggsave(paste0("output/BC-ellipse_", my_column,".pdf"), height=3, width=4.5, device="pdf") # save a PDF 3 inches by 4 inches
+
+ggplot(bc_meta, aes(x=PC1, y=PC2, color=get(my_column))) +
+  geom_point(aes(shape= Material)) + #alpha controls transparency and helps when points are overlapping
+  geom_point(data=centroids, size = 3) +
+  theme_q2r() +
+  stat_ellipse(level = 0.95, type = "t") +
+  xlab(paste0("PC1 (", round(100*bc_PCoA$data$ProportionExplained[1], digits = 2), "%)")) +
+  ylab(paste0("PC2 (", round(100*bc_PCoA$data$ProportionExplained[2], digits = 2), "%)")) 
+scale_color_manual(values=stagtime_colors, name = "Stagnation Time")
+ggsave(paste0("output/BC-ellipse_", my_column,"-second.pdf"), height=3, width=4.5, device="pdf") # save a PDF 3 inches by 4 inches
+
+## SAME thing but with weighted UniFrac
+
+Wuni_PCoA<-read_qza("core-metrics-results/weighted_unifrac_pcoa_results.qza")
+
+Wuni_meta <- Wuni_PCoA$data$Vectors %>%
+  select(SampleID, PC1, PC2) %>%
+  inner_join(metadata, by = c("SampleID" = "SampleID"))
+
+centroids <- aggregate(cbind(PC1,PC2)~get(my_column),Wuni_meta,mean)
+
+ggplot(Wuni_meta, aes(x=PC1, y=PC2, color=get(my_column))) +
+  geom_point() + #alpha controls transparency and helps when points are overlapping
+  #geom_point(data=centroids, size = 3) +
+  theme_q2r() +
+  stat_ellipse(level = 0.95, type = "t") +
+  xlab(paste0("PC1 (", round(100*Wuni_PCoA$data$ProportionExplained[1], digits = 2), "%)")) +
+  ylab(paste0("PC2 (", round(100*Wuni_PCoA$data$ProportionExplained[2], digits = 2), "%)")) +
+  scale_color_manual(values=stagtime_colors, name = "Stagnation Time")
+ggsave(paste0("output/Wuni-ellipse_", my_column,".pdf"), height=3, width=4.5, device="pdf") # save a PDF 3 inches by 4 inches
+
+ggplot(Wuni_meta, aes(x=PC1, y=PC2, color=get(my_column))) +
+  geom_point(aes(shape= Material), size = 1.8, alpha=0.7) + #alpha controls transparency and helps when points are overlapping
+  #geom_point(data=centroids, size = 3) +
+  theme_q2r() +
+  stat_ellipse(level = 0.95, type = "t") +
+  xlab(paste0("PC1 (", round(100*Wuni_PCoA$data$ProportionExplained[1], digits = 2), "%)")) +
+  ylab(paste0("PC2 (", round(100*Wuni_PCoA$data$ProportionExplained[2], digits = 2), "%)")) +
+  scale_color_manual(values=stagtime_colors, name = "Stagnation Time")
+ggsave(paste0("output/Wuni-ellipse_", my_column,"-second.pdf"), height=3, width=4.5, device="pdf") # save a PDF 3 inches by 4 inches
+
+uWuni_PCoA<-read_qza("core-metrics-results/unweighted_unifrac_pcoa_results.qza")
+
+uWuni_meta <- uWuni_PCoA$data$Vectors %>%
+  select(SampleID, PC1, PC2) %>%
+  inner_join(metadata, by = c("SampleID" = "SampleID"))
+
+centroids <- aggregate(cbind(PC1,PC2)~get(my_column),uWuni_meta,mean)
+
+ggplot(uWuni_meta, aes(x=PC1, y=PC2, color=get(my_column))) +
+  geom_point() + #alpha controls transparency and helps when points are overlapping
+  #geom_point(data=centroids, size = 3) +
+  theme_q2r() +
+  stat_ellipse(level = 0.95, type = "t") +
+  xlab(paste0("PC1 (", round(100*uWuni_PCoA$data$ProportionExplained[1], digits = 2), "%)")) +
+  ylab(paste0("PC2 (", round(100*uWuni_PCoA$data$ProportionExplained[2], digits = 2), "%)")) +
+  scale_color_manual(values=stagtime_colors, name = "Stagnation Time")
+ggsave(paste0("output/uWuni-ellipse_", my_column,".pdf"), height=3, width=4.5, device="pdf") # save a PDF 3 inches by 4 inches
+
+ggplot(uWuni_meta, aes(x=PC1, y=PC2, color=get(my_column))) +
+  geom_point(aes(shape= Material), size = 1.8, alpha=0.7) + #alpha controls transparency and helps when points are overlapping
+  #geom_point(data=centroids, size = 3) +
+  theme_q2r() +
+  stat_ellipse(level = 0.95, type = "t") +
+  xlab(paste0("PC1 (", round(100*uWuni_PCoA$data$ProportionExplained[1], digits = 2), "%)")) +
+  ylab(paste0("PC2 (", round(100*uWuni_PCoA$data$ProportionExplained[2], digits = 2), "%)")) +
+  scale_color_manual(values=stagtime_colors, name = "Stagnation Time")
+ggsave(paste0("output/uWuni-ellipse_", my_column,"-second.pdf"), height=3, width=4.5, device="pdf") # save a PDF 3 inches by 4 inches
+
+
+
+# jaccard run 2 because the first run may have an error
+
+ja2_PCoA<-read_qza("core-metrics-results/jaccard_pcoa_results.qza")
+
+ja2_meta <- ja2_PCoA$data$Vectors %>%
+  select(SampleID, PC1, PC2) %>%
+  inner_join(metadata, by = c("SampleID" = "SampleID"))
+
+centroids <- aggregate(cbind(PC1,PC2)~get(my_column),ja2_meta,mean)
+colnames(centroids)[1] <- "stagnation.time"
+
+ggplot(ja2_meta, aes(x=PC1, y=PC2, color=get(my_column))) +
+  geom_point() + #alpha controls transparency and helps when points are overlapping
+  geom_point(data=centroids, size = 3) +
+  theme_q2r() +
+  stat_ellipse(level = 0.95, type = "t") +
+  xlab(paste0("PC1 (", round(100*ja2_PCoA$data$ProportionExplained[1], digits = 2), "%)")) +
+  ylab(paste0("PC2 (", round(100*ja2_PCoA$data$ProportionExplained[2], digits = 2), "%)")) +
+  scale_color_manual(values=stagtime_colors, name = "Stagnation Time")
+ggsave(paste0("output/ja2-ellipse_", my_column,".pdf"), height=3, width=4.5, device="pdf") # save a PDF 3 inches by 4 inches
+
+ggplot(ja2_meta, aes(x=PC1, y=PC2, color=get(my_column))) +
+  geom_point(aes(shape= Material), alpha=0.7) + #alpha controls transparency and helps when points are overlapping
+  #geom_point(data=centroids, size = 3) +
+  theme_q2r() +
+  stat_ellipse(level = 0.95, type = "t") +
+  xlab(paste0("PC1 (", round(100*ja2_PCoA$data$ProportionExplained[1], digits = 2), "%)")) +
+  ylab(paste0("PC2 (", round(100*ja2_PCoA$data$ProportionExplained[2], digits = 2), "%)")) +
+  scale_color_manual(values=stagtime_colors, name = "Stagnation Time")
+ggsave(paste0("output/ja2-ellipse_", my_column,"-second.pdf"), height=3, width=4.5, device="pdf") # save a PDF 3 inches by 4 inches
+
+#bcrun2 because the first run may have an error
+
+bc2_PCoA<-read_qza("core-metrics-results/bray_curtis_pcoa_results.qza")
+
+bc2_meta <- bc2_PCoA$data$Vectors %>%
+  select(SampleID, PC1, PC2) %>%
+  inner_join(metadata, by = c("SampleID" = "SampleID"))
+
+centroids <- aggregate(cbind(PC1,PC2)~get(my_column),bc2_meta,mean)
+colnames(centroids)[1] <- "stagnation.time"
+
+ggplot(bc2_meta, aes(x=PC1, y=PC2, color=get(my_column))) +
+  geom_point() + #alpha controls transparency and helps when points are overlapping
+  geom_point(data=centroids, size = 3) +
+  theme_q2r() +
+  stat_ellipse(level = 0.95, type = "t") +
+  xlab(paste0("PC1 (", round(100*bc2_PCoA$data$ProportionExplained[1], digits = 2), "%)")) +
+  ylab(paste0("PC2 (", round(100*bc2_PCoA$data$ProportionExplained[2], digits = 2), "%)")) +
+  scale_color_manual(values=stagtime_colors, name = "Stagnation Time")
+ggsave(paste0("output/bc2-ellipse_", my_column,".pdf"), height=3, width=4.5, device="pdf") # save a PDF 3 inches by 4 inches
+
+ggplot(bc2_meta, aes(x=PC1, y=PC2, color=get(my_column))) +
+  geom_point(aes(shape= Material), alpha=0.7) + #alpha controls transparency and helps when points are overlapping
+  #geom_point(data=centroids, size = 3) +
+  theme_q2r() +
+  stat_ellipse(level = 0.95, type = "t") +
+  xlab(paste0("PC1 (", round(100*bc2_PCoA$data$ProportionExplained[1], digits = 2), "%)")) +
+  ylab(paste0("PC2 (", round(100*bc2_PCoA$data$ProportionExplained[2], digits = 2), "%)")) +
+  scale_color_manual(values=stagtime_colors, name = "Stagnation Time")
+ggsave(paste0("output/bc2-ellipse_", my_column,"-second.pdf"), height=3, width=4.5, device="pdf") # save a PDF 3 inches by 4 inches
+
+
+
+
+
+

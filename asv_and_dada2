@@ -1,0 +1,33 @@
+
+#!/bin/sh -l
+
+#SBATCH --nodes=1                    ##number of requested nodes (a node is a group of CPUs)
+#SBATCH -n 50                        ##number of requested CPUs
+#SBATCH --time=06:00:00              ##time requested
+#SBATCH --job-name MP-pipeline       ##name of job
+#SBATCH -A microbiome                ##name of the queue you are using. Could be scholar or microbiome if you are on sn$
+
+#########################################################################
+# This code is used to complete dada2 and make an asv table.
+qiime dada2 denoise-paired \
+  --i-demultiplexed-seqs demux-full-new.qza \
+  --p-trim-left-f 12 \
+  --p-trim-left-r 12 \
+  --p-trunc-len-f 220 \
+  --p-trunc-len-r 210 \
+  --o-table table.qza \
+  --o-representative-sequences rep-seqs.qza \
+  --o-denoising-stats denoising-stats.qza
+
+qiime feature-table summarize \
+  --i-table table.qza \
+  --o-visualization table.qzv \
+  --m-sample-metadata-file Proctor_Metadata_ansc516_excel.tsv
+
+qiime feature-table tabulate-seqs \
+  --i-data rep-seqs.qza \
+  --o-visualization rep-seqs.qzv
+
+qiime metadata tabulate \
+  --m-input-file denoising-stats.qza \
+  --o-visualization denoising-stats.qzv

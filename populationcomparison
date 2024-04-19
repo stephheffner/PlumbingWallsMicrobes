@@ -1,0 +1,128 @@
+
+#!/bin/sh -l
+
+#SBATCH --nodes=1                 ##number of requested nodes (a node is a group of CPUs)
+#SBATCH -n 50                      ##number of requested CPUs
+#SBATCH --time=04:00:00             ##time requested
+#SBATCH --job-name soil_pipeline3    ##name of job
+#SBATCH -A microbiome                 ##name of the queue you are using.
+
+#########################################################################
+
+echo "Start time"
+date +"%d %B %Y %H:%M:%S"
+
+#step 1, cd into the proper directory. This directory must already exist
+
+cd $RCAC_SCRATCH
+cd ansc516project
+
+#step 2, Load Modules
+
+echo "loading bioinfo"
+module load bioinfo
+
+echo "loading qiime2-2023.9"
+module load Qiime/2-2023.9
+
+qiime feature-classifier classify-sklearn \
+  --i-classifier gg-13-8-99-515-806-nb-classifier.qza \
+  --i-reads rep-seqs.qza \
+  --o-classification taxonomy.qza
+
+qiime metadata tabulate \
+  --m-input-file taxonomy.qza \
+  --o-visualization taxonomy.qzv
+
+qiime taxa barplot \
+  --i-table table.qza \
+  --i-taxonomy taxonomy.qza \
+    --m-metadata-file Proctor_Metadata_ansc516_excel.tsv \
+  --o-visualization taxa-bar-plots.qzv
+
+
+qiime feature-table filter-samples \
+  --i-table table.qza \
+  --m-metadata-file Proctor_Metadata_ansc516_excel.tsv \
+  --p-where "[Material]='Blank'" \
+  --o-filtered-table Blank-table.qza
+
+qiime feature-table filter-samples \
+  --i-table table.qza \
+  --m-metadata-file Proctor_Metadata_ansc516_excel.tsv \
+    --p-where "[Material]='Influent'" \
+  --o-filtered-table Influent-table.qza
+
+qiime feature-table filter-samples \
+  --i-table table.qza \
+  --m-metadata-file Proctor_Metadata_ansc516_excel.tsv \
+  --p-where "[Material]='SE'" \
+  --o-filtered-table SE-table.qza
+
+qiime feature-table filter-samples \
+  --i-table table.qza \
+  --m-metadata-file Proctor_Metadata_ansc516_excel.tsv \
+  --p-where "[Material]='Heater'" \
+    --o-filtered-table Heater-table.qza
+
+qiime feature-table filter-samples \
+  --i-table table.qza \
+  --m-metadata-file Proctor_Metadata_ansc516_excel.tsv \
+  --p-where "[Material]='CopperPipe'" \
+  --o-filtered-table CopperPipe-table.qza
+
+qiime composition ancombc \
+  --i-table Blank-table.qza \
+  --m-metadata-file Proctor_Metadata_ansc516_excel.tsv \
+  --p-formula 'StagnationTime' \
+  --o-differentials Blank-ancombc-StagnationTime.qza
+  
+qiime composition da-barplot \
+  --i-data Blank-ancombc-StagnationTime.qza \
+  --p-significance-threshold 0.001 \
+  --o-visualization Blank-da-barplot-StagnationTime.qzv
+
+qiime composition ancombc \
+  --i-table Influent-table.qza \
+  --m-metadata-file Proctor_Metadata_ansc516_excel.tsv \
+  --p-formula 'StagnationTime' \
+  --o-differentials Influent-ancombc-StagnationTime.qza
+
+qiime composition da-barplot \
+  --i-data Influent-ancombc-StagnationTime.qza \
+  --p-significance-threshold 0.001 \
+  --o-visualization Influent-da-barplot-StagnationTime.qzv
+
+qiime composition ancombc \
+  --i-table SE-table.qza \
+  --m-metadata-file Proctor_Metadata_ansc516_excel.tsv \
+  --p-formula 'StagnationTime' \
+  --o-differentials SE-ancombc-StagnationTime.qza
+
+qiime composition da-barplot \
+  --i-data SE-ancombc-StagnationTime.qza \
+  --p-significance-threshold 0.001 \
+    --o-visualization SE-da-barplot-StagnationTime.qzv
+
+qiime composition ancombc \
+  --i-table Heater-table.qza \
+  --m-metadata-file Proctor_Metadata_ansc516_excel.tsv \
+  --p-formula 'StagnationTime' \
+  --o-differentials Heater-ancombc-StagnationTime.qza
+
+qiime composition da-barplot \
+  --i-data Heater-ancombc-StagnationTime.qza \
+  --p-significance-threshold 0.001 \
+  --o-visualization Heater-da-barplot-StagnationTime.qzv
+  
+qiime composition ancombc \
+  --i-table CopperPipe-table.qza \
+  --m-metadata-file Proctor_Metadata_ansc516_excel.tsv \
+  --p-formula 'StagnationTime' \
+  --o-differentials CopperPipe-ancombc-StagnationTime.qza
+
+qiime composition da-barplot \
+  --i-data CopperPipe-ancombc-StagnationTime.qza \
+  --p-significance-threshold 0.001 \
+  --o-visualization CopperPipe-da-barplot-StagnationTime.qzv
+  

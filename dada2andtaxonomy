@@ -1,0 +1,41 @@
+
+#!/bin/sh -l
+
+#SBATCH --nodes=1                     ##number of requested nodes (a node is a group of CPUs)
+#SBATCH -n 50                         ##number of requested CPUs
+#SBATCH --time=04:00:00               ##time requested
+#SBATCH --job-name soil_pipeline1     ##name of job
+#SBATCH -A microbiome                 ##name of the queue you are using. Could be scholar or microbiome if you are on s$
+
+#########################################################################
+cd $RCAC_SCRATCH
+cd ansc516project
+
+pwd
+
+#step 2, Load Modules
+
+echo "loading bioinfo"
+module load bioinfo
+
+echo "loading qiime2-2023.9"
+module load Qiime/2-2023.9
+
+qiime dada2 denoise-paired \
+> --i-demultiplexed-seqs demux-full-new.qza \
+> --p-trim-left-f 12 \
+> --p-trim-left-r 12 \
+> --p-trunc-len-f 220 \
+> --p-trunc-len-r 210 \
+> --o-table table.qza \
+> --o-representative-sequences rep-seqs.qza \
+> --o-denoising-stats denoising-stats.qza
+
+qiime feature-classifier classify-sklearn \
+  --i-classifier gg-13-8-99-515-806-nb-classifier.qza \
+  --i-reads rep-seqs.qza \
+  --o-classification taxonomy.qza
+
+qiime metadata tabulate \
+  --m-input-file taxonomy.qza \
+  --o-visualization taxonomy.qzv

@@ -1,0 +1,109 @@
+
+#!/bin/sh -l
+
+#SBATCH --nodes=1                 ##number of requested nodes (a node is a group of CPUs)
+#SBATCH -n 50                      ##number of requested CPUs
+#SBATCH --time=04:00:00             ##time requested
+#SBATCH --job-name soil_pipeline3    ##name of job
+#SBATCH -A microbiome                 ##name of the queue you are using.
+
+#########################################################################
+
+echo "Start time"
+date +"%d %B %Y %H:%M:%S"
+
+#step 1, cd into the proper directory. This directory must already exist
+
+cd $RCAC_SCRATCH
+cd ansc516project
+
+#step 2, Load Modules
+
+echo "loading bioinfo"
+module load bioinfo
+
+echo "loading qiime2-2023.9"
+module load Qiime/2-2023.9
+
+qiime phylogeny align-to-tree-mafft-fasttree \
+  --i-sequences rep-seqs.qza \
+  --o-alignment aligned-rep-seqs.qza \
+  --o-masked-alignment masked-aligned-rep-seqs.qza \
+  --o-tree unrooted-tree.qza \
+  --o-rooted-tree rooted-tree.qza
+
+
+#Calculate diversity metrics. You will need to designate a --p-sampling-depth. You will want to consult the rarifacti
+qiime diversity core-metrics-phylogenetic \
+  --i-phylogeny rooted-tree.qza \
+  --i-table table.qza \
+  --p-sampling-depth 18250 \
+  --m-metadata-file Proctor_Metadata_ansc516_excel.tsv \
+  --output-dir core-metrics-results
+
+qiime diversity alpha \
+  --i-table table.qza \
+  --p-metric chao1 \
+  --o-alpha-diversity core-metrics-results/chao1_vector.qza
+
+#Statistical testing
+
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity core-metrics-results/faith_pd_vector.qza \
+  --m-metadata-file Proctor_Metadata_ansc516_excel.tsv \
+  --o-visualization core-metrics-results/faith-pd-group-significance.qzv
+
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity core-metrics-results/shannon_vector.qza \
+  --m-metadata-file Proctor_Metadata_ansc516_excel.tsv \
+  --o-visualization core-metrics-results/shannon-group-significance.qzv
+
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity core-metrics-results/observed_features_vector.qza \
+  --m-metadata-file Proctor_Metadata_ansc516_excel.tsv \
+  --o-visualization core-metrics-results/observed_features-group-significance.qzv
+
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity core-metrics-results/chao1_vector.qza \
+  --m-metadata-file Proctor_Metadata_ansc516_excel.tsv \
+  --o-visualization core-metrics-results/chao1-group-significance.qzv
+
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity core-metrics-results/evenness_vector.qza \
+  --m-metadata-file Proctor_Metadata_ansc516_excel.tsv \
+  --o-visualization core-metrics-results/evenness-group-significance.qzv
+
+
+#PERMANOVA. This section must be editted on the 4th line: --m-metadata-column, replace body-site with your desired met
+qiime diversity beta-group-significance \
+  --i-distance-matrix core-metrics-results/unweighted_unifrac_distance_matrix.qza \
+  --m-metadata-file Proctor_Metadata_ansc516_excel.tsv \
+  --m-metadata-column StagnationTime \
+  --o-visualization core-metrics-results/unweighted-unifrac-stagnation-time-significance.qzv \
+  --p-pairwise
+
+#PERMDISP. This section must be editted on the 4th line: --m-metadata-column, replace body-site with your desired meta
+qiime diversity beta-group-significance \
+  --i-distance-matrix core-metrics-results/unweighted_unifrac_distance_matrix.qza \
+  --m-metadata-file Proctor_Metadata_ansc516_excel.tsv \
+  --m-metadata-column Material \
+  --p-method 'permdisp' \
+  --o-visualization core-metrics-results/unweighted-unifrac-material-permdisp.qzv \
+  --p-pairwise
+
+#PERMANOVA. This section must be editted on the 4th line: --m-metadata-column, replace subject with your desired metada
+qiime diversity beta-group-significance \
+  --i-distance-matrix core-metrics-results/weighted_unifrac_distance_matrix.qza \
+  --m-metadata-file Proctor_Metadata_ansc516_excel.tsv \
+  --m-metadata-column "Stagnation Time" \
+  --o-visualization core-metrics-results/weighted-unifrac-stagnation-time-significance.qzv \
+  --p-pairwise
+
+#PERMDISP. This section must be editted on the 4th line: --m-metadata-column, replace subject with your desired metadat
+qiime diversity beta-group-significance \
+  --i-distance-matrix core-metrics-results/weighted_unifrac_distance_matrix.qza \
+  --m-metadata-file Proctor_Metadata_ansc516_excel.tsv \
+  --m-metadata-column Material \
+  --p-method 'permdisp' \
+  --o-visualization core-metrics-results/unweighted-unifrac-material-permdisp.qzv \
+  --p-pairwise

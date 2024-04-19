@@ -1,0 +1,80 @@
+
+#!/bin/sh -l
+
+#SBATCH --nodes=1                 ##number of requested nodes (a node is a group of CPUs)
+#SBATCH -n 50                      ##number of requested CPUs
+#SBATCH --time=04:00:00             ##time requested
+#SBATCH --job-name soil_pipeline3    ##name of job
+#SBATCH -A microbiome                 ##name of the queue you are using.
+
+#########################################################################
+
+echo "Start time"
+date +"%d %B %Y %H:%M:%S"
+
+#step 1, cd into the proper directory. This directory must already exist
+
+cd $RCAC_SCRATCH
+cd ansc516project
+
+#step 2, Load Modules
+
+echo "loading bioinfo"
+module load bioinfo
+
+echo "loading qiime2-2023.9"
+module load Qiime/2-2023.9
+
+qiime taxa collapse \
+  --i-table table.qza \
+  --i-taxonomy taxonomy.qza \
+  --p-level 6 \
+  --o-collapsed-table table-l6.qza
+
+qiime composition ancombc \
+  --i-table table-l6.qza \
+  --m-metadata-file Proctor_Metadata_ansc516_excel.tsv \
+  --p-formula 'StagnationTime' \
+  --o-differentials l6-ancombc-StagnationTime.qza
+
+qiime composition da-barplot \
+  --i-data l6-ancombc-StagnationTime.qza \
+  --p-significance-threshold 0.001 \
+  --p-level-delimiter ';' \
+  --o-visualization l6-da-barplot-StagnationTime.qzv
+
+qiime taxa collapse \
+  --i-table table.qza \
+  --i-taxonomy taxonomy.qza \
+  --p-level 5 \
+  --o-collapsed-table table-l5.qza
+
+qiime composition ancombc \
+  --i-table table-l5.qza \
+  --m-metadata-file Proctor_Metadata_ansc516_excel.tsv \
+  --p-formula 'StagnationTime' \
+  --o-differentials l5-ancombc-StagnationTime.qza
+
+qiime composition da-barplot \
+  --i-data l5-ancombc-StagnationTime.qza \
+  --p-significance-threshold 0.001 \
+  --p-level-delimiter ';' \
+  --o-visualization l5-da-barplot-StagnationTime.qzv
+
+qiime taxa collapse \
+  --i-table table.qza \
+  --i-taxonomy taxonomy.qza \
+  --p-level 7 \
+  --o-collapsed-table table-l7.qza
+
+qiime composition ancombc \
+  --i-table table-l7.qza \
+  --m-metadata-file Proctor_Metadata_ansc516_excel.tsv \
+  --p-formula 'StagnationTime' \
+  --o-differentials l7-ancombc-StagnationTime.qza
+
+qiime composition da-barplot \
+  --i-data l7-ancombc-StagnationTime.qza \
+  --p-significance-threshold 0.001 \
+  --p-level-delimiter ';' \
+  --o-visualization l7-da-barplot-StagnationTime.qzv

@@ -1,0 +1,77 @@
+
+#!/bin/sh -l
+
+#SBATCH --nodes=1                 ##number of requested nodes (a node is a group of CPUs)
+#SBATCH -n 50                      ##number of requested CPUs
+#SBATCH --time=04:00:00             ##time requested
+#SBATCH --job-name soil_pipeline3    ##name of job
+#SBATCH -A microbiome                 ##name of the queue you are using.
+
+#########################################################################
+
+echo "Start time"
+date +"%d %B %Y %H:%M:%S"
+
+#step 1, cd into the proper directory. This directory must already exist
+
+cd $RCAC_SCRATCH
+cd ansc516project
+
+#step 2, Load Modules
+
+echo "loading bioinfo"
+module load bioinfo
+
+echo "loading qiime2-2023.9"
+module load Qiime/2-2023.9
+
+qiime sample-classifier classify-samples \
+  --i-table table.qza \
+  --m-metadata-file Proctor_Metadata_ansc516_excel.tsv \
+  --m-metadata-column StagnationTime \
+  --p-optimize-feature-selection \
+  --p-parameter-tuning \
+  --p-estimator RandomForestClassifier \
+  --p-n-estimators 20 \
+  --p-random-state 123 \
+  --output-dir classifier
+
+qiime metadata tabulate \
+  --m-input-file classifier/predictions.qza \
+  --o-visualization classifier/predictions.qzv
+
+qiime metadata tabulate \
+  --m-input-file classifier/probabilities.qza \
+  --o-visualization classifier/probabilities.qzv
+
+qiime metadata tabulate \
+  --m-input-file classifier/feature_importance.qza \
+  --o-visualization classifier/feature_importance.qzv
+
+qiime feature-table filter-features \
+  --i-table table.qza \
+  --m-metadata-file classifier/feature_importance.qza \
+  --o-filtered-table classifier/important-feature-table.qza
+
+qiime sample-classifier heatmap \
+  --i-table table.qza \
+  --i-importance classifier/feature_importance.qza \
+  --m-sample-metadata-file Proctor_Metadata_ansc516_excel.tsv \
+  --m-sample-metadata-column StagnationTime \
+  --p-group-samples \
+  --p-feature-count 30 \
+  --o-filtered-table classifier/important-feature-table-top-30.qza \
+  --o-heatmap classifier/important-feature-heatmap.qzv
+
+qiime sample-classifier heatmap \
+--i-table table.qza \
+--i-importance classifier/feature_importance.qza  \
+--m-sample-metadata-file Proctor_Metadata_ansc516_excel.tsv  \
+--m-sample-metadata-column StagnationTime \
+--m-feature-metadata-file taxonomy.qza \
+--m-feature-metadata-column Taxon \
+--p-group-samples  \
+--p-feature-count 30  \
+--o-filtered-table classifier/important-feature-table-taxonomy-top-30.qza \
+--o-heatmap classifier/important-feature-heatmap-taxonomy.qzv
+
